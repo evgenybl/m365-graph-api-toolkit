@@ -119,5 +119,5 @@ python scripts/get_security_alerts_report.py --severity high --days 7
 ## Author
 
 **Evgeny Blekhman**
-Microsoft 365 & Azure Administrator | 7+ years enterprise IT
+Microsoft 365 & Azure Administrator | 8 years enterprise IT
 [LinkedIn](https://www.linkedin.com/in/evgeny-blekhman) | [GitHub](https://github.com/evgenybl)
