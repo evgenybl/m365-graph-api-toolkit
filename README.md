@@ -2,7 +2,9 @@
 
 Python scripts for Microsoft 365 administration via Microsoft Graph API. Built for IT admins who want quick, reliable reports without navigating the admin center.
 
-These scripts handle authentication, pagination, and CSV export out of the box. Point them at a tenant and get actionable data.
+These scripts handle authentication, pagination, and CSV export.
+
+**Status: reference code.** There are no automated tests in this repository, and the scripts have not been run against a live tenant from here. Try them on a test tenant first.
 
 ---
 
@@ -32,9 +34,9 @@ pip install msal requests
 4. Create a client secret under **Certificates & secrets**
 5. Grant these **application permissions** under **API permissions**:
    - `User.Read.All` (for user reports)
-   - `AuditLog.Read.All` (for sign-in activity)
+   - `AuditLog.Read.All` (for sign-in activity; Microsoft Graph also requires a Microsoft Entra ID P1 or P2 license for it)
    - `Organization.Read.All` (for license reports)
-   - `SecurityEvents.Read.All` (for security alerts)
+   - `SecurityAlert.Read.All` (for security alerts: the permission Microsoft documents for `alerts_v2`, which the script calls; the script's own header still names `SecurityEvents.Read.All`)
 6. Click **Grant admin consent**
 
 ### 3. Run a script
@@ -52,6 +54,8 @@ python scripts/get_inactive_users_report.py \
 
 ## Script Details
 
+Every command below also needs `--tenant-id`, `--client-id` and `--client-secret`, as in the Setup example. They are left out here to keep the examples short.
+
 ### get_inactive_users_report.py
 
 Finds enabled users with no sign-in activity within a configurable number of days.
@@ -64,7 +68,7 @@ python scripts/get_inactive_users_report.py --days 90 --output inactive.csv
 python scripts/get_inactive_users_report.py --days 60 --licensed-only
 ```
 
-**Output columns:** DisplayName, UPN, Email, Department, JobTitle, LastSignIn, DaysInactive, LicenseCount
+**Output columns:** DisplayName, UserPrincipalName, Email, Department, JobTitle, AccountEnabled, LastSignIn, DaysInactive, LicenseCount, CreatedDate
 
 ---
 
@@ -109,15 +113,14 @@ python scripts/get_security_alerts_report.py --severity high --days 7
 
 ## Notes
 
-- All scripts handle pagination automatically (works on tenants of any size).
+- All scripts follow Microsoft Graph's paging links until the last page.
 - Credentials are passed as command-line arguments. For production use, switch to environment variables or a secrets manager.
-- Developed and tested with AI-assisted workflows (Claude, GitHub Copilot) for faster iteration and better error handling.
+- Written with AI-assisted workflows (Claude, GitHub Copilot).
+- Known limitation: `get_inactive_users_report.py` sorts its CSV by days inactive as text, so the order is not numeric.
 - CSV output works with Excel, Power BI, or any reporting tool.
 
 ---
 
 ## Author
 
-**Evgeny Blekhman**
-Microsoft 365 & Azure Administrator | 8 years enterprise IT
-[LinkedIn](https://www.linkedin.com/in/evgeny-blekhman) | [GitHub](https://github.com/evgenybl)
+**Evgeny Blekhman** · [LinkedIn](https://www.linkedin.com/in/evgeny-blekhman/) · [GitHub](https://github.com/evgenybl)
