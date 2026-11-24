@@ -12,7 +12,7 @@ Authentication:
     Uses app-only authentication with client credentials.
     Register an app in Entra ID with Organization.Read.All permission.
 
-Usage:
+Usage (every run also needs --tenant-id, --client-id and --client-secret):
     python get_license_usage_report.py --output license_report.csv
     python get_license_usage_report.py --pricing pricing.json --output license_report.csv
 """
@@ -55,6 +55,12 @@ SKU_NAMES = {
     "INTUNE_A": "Microsoft Intune Plan 1",
 }
 
+# CSV columns, in output order. Written as the header even when there are no SKUs.
+COLUMNS = [
+    "SKU", "Product", "Total", "Assigned", "Available",
+    "Utilization", "UnitPrice_USD", "MonthlyWaste_USD",
+]
+
 
 def get_access_token(tenant_id, client_id, client_secret):
     authority = f"https://login.microsoftonline.com/{tenant_id}"
@@ -71,14 +77,21 @@ def get_access_token(tenant_id, client_id, client_secret):
 
 
 def get_subscribed_skus(token):
-    """Fetch all subscribed SKUs from the tenant."""
+    """Fetch all subscribed SKUs from the tenant, following paging links if Graph returns any."""
     url = "https://graph.microsoft.com/v1.0/subscribedSkus"
     headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
-        print(f"API error {response.status_code}: {response.text[:200]}")
-        sys.exit(1)
-    return response.json().get("value", [])
+    skus = []
+
+    while url:
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            print(f"API error {response.status_code}: {response.text[:200]}")
+            sys.exit(1)
+        data = response.json()
+        skus.extend(data.get("value", []))
+        url = data.get("@odata.nextLink")
+
+    return skus
 
 
 def main():
@@ -113,7 +126,8 @@ def main():
         utilization = (consumed / total * 100) if total > 0 else 0
 
         unit_price = pricing.get(part_number, 0)
-        monthly_waste = available * unit_price
+        # More units assigned than enabled gives a negative Available; that is not negative waste.
+        monthly_waste = max(available, 0) * unit_price
 
         if unit_price > 0:
             total_waste += monthly_waste
@@ -132,7 +146,7 @@ def main():
     rows.sort(key=lambda x: x["Assigned"], reverse=True)
 
     with open(args.output, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys() if rows else [])
+        writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
 

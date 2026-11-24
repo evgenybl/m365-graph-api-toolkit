@@ -12,7 +12,7 @@ Authentication:
     Uses app-only authentication with client credentials.
     Register an app in Entra ID with User.Read.All and AuditLog.Read.All permissions.
 
-Usage:
+Usage (every run also needs --tenant-id, --client-id and --client-secret):
     python get_inactive_users_report.py --days 90 --output inactive_users.csv
     python get_inactive_users_report.py --days 60 --licensed-only
 """
@@ -28,6 +28,12 @@ try:
 except ImportError:
     print("Missing dependencies. Run: pip install msal requests")
     sys.exit(1)
+
+# CSV columns, in output order. Written as the header even when no user qualifies.
+COLUMNS = [
+    "DisplayName", "UserPrincipalName", "Email", "Department", "JobTitle",
+    "AccountEnabled", "LastSignIn", "DaysInactive", "LicenseCount", "CreatedDate",
+]
 
 
 def get_access_token(tenant_id, client_id, client_secret):
@@ -123,13 +129,18 @@ def main():
                 "LastSignIn": last_sign_in.strftime("%Y-%m-%d %H:%M") if last_sign_in else "Never",
                 "DaysInactive": days_since,
                 "LicenseCount": len(user.get("assignedLicenses", [])),
-                "CreatedDate": user.get("createdDateTime", "")[:10],
+                # createdDateTime can be null in Graph's answer; write an empty cell then.
+                "CreatedDate": (user.get("createdDateTime") or "")[:10],
             })
 
-    inactive.sort(key=lambda x: str(x["DaysInactive"]), reverse=True)
+    # Most inactive first: users who never signed in, then by days inactive as a number.
+    inactive.sort(
+        key=lambda x: float("inf") if x["DaysInactive"] == "Never" else x["DaysInactive"],
+        reverse=True,
+    )
 
     with open(args.output, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=inactive[0].keys() if inactive else [])
+        writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
         writer.writerows(inactive)
 

@@ -1,7 +1,7 @@
 """
 Get Security Alerts Report
-Queries Microsoft Graph Security API for active alerts and produces a
-prioritized report grouped by severity.
+Queries the Microsoft Graph Security API (alerts_v2) for alerts created in the
+look-back period, whatever their status, and produces a report sorted by severity.
 
 Covers alerts from Defender for Endpoint, Defender for Identity, Defender
 for Office 365, Entra ID Protection, and other integrated security providers.
@@ -11,9 +11,10 @@ Requirements:
 
 Authentication:
     Uses app-only authentication with client credentials.
-    Register an app in Entra ID with SecurityEvents.Read.All permission.
+    Register an app in Entra ID with the SecurityAlert.Read.All application permission
+    (the permission for the alerts_v2 endpoint this script calls).
 
-Usage:
+Usage (every run also needs --tenant-id, --client-id and --client-secret):
     python get_security_alerts_report.py --output alerts.csv
     python get_security_alerts_report.py --severity high --days 7
 """
@@ -29,6 +30,12 @@ try:
 except ImportError:
     print("Missing dependencies. Run: pip install msal requests")
     sys.exit(1)
+
+# CSV columns, in output order. Written as the header even when there are no alerts.
+COLUMNS = [
+    "Severity", "Title", "Status", "Classification", "Category",
+    "Source", "Created", "AffectedEntities", "AlertId",
+]
 
 
 def get_access_token(tenant_id, client_id, client_secret):
@@ -139,7 +146,7 @@ def main():
     rows.sort(key=lambda x: (severity_order.get(x["Severity"], 9), x["Created"]))
 
     with open(args.output, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=rows[0].keys() if rows else [])
+        writer = csv.DictWriter(f, fieldnames=COLUMNS)
         writer.writeheader()
         writer.writerows(rows)
 
